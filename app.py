@@ -38,7 +38,7 @@ st.markdown("""
         padding-right: 1.2rem !important;
     }
 
-    /* Top Navigation Bar - De-emphasized & Compact */
+    /* Top Navigation Bar */
     .subtle-nav {
         display: flex;
         justify-content: center;
@@ -67,10 +67,39 @@ st.markdown("""
 
     .tagline {
         text-align: center;
-        font-size: 0.9rem;
-        color: #8E849B;
+        font-size: 0.95rem;
+        color: #6C6377;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    /* Clean Home Screen Hero Card */
+    .home-hero-card {
+        background-color: #FFFFFF;
+        padding: 36px 24px;
+        border-radius: 28px;
+        box-shadow: 0 10px 25px rgba(60, 42, 77, 0.05);
+        border: 2px solid #EFEAE2;
+        text-align: center;
         margin-bottom: 24px;
-        font-style: italic;
+    }
+
+    .home-hero-icon {
+        font-size: 2.8rem;
+        margin-bottom: 12px;
+    }
+
+    .home-hero-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #3C2A4D;
+        margin-bottom: 8px;
+    }
+
+    .home-hero-text {
+        font-size: 0.95rem;
+        color: #7D7589;
+        line-height: 1.4;
     }
 
     /* Conversation Card Physical Styling */
@@ -97,7 +126,7 @@ st.markdown("""
         margin-bottom: 18px;
     }
 
-    /* Distinct Category Personalities */
+    /* Category Styling */
     .tag-note {
         background-color: #FDF0ED;
         color: #C85A32;
@@ -216,7 +245,7 @@ st.markdown("""
         color: #5842C3 !important;
     }
 
-    /* Quiet Navigation Buttons Override */
+    /* Navigation Buttons Override */
     .nav-btn button {
         min-height: 38px !important;
         padding: 6px 12px !important;
@@ -262,19 +291,34 @@ st.markdown("""
 DATA_FILE = "data.json"
 
 def load_data():
+    default_house = [
+        {
+            "id": 0,
+            "content": "**ANONYMOUS NOTE 📝**\n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
+            "likes": 0,
+            "comments": []
+        }
+    ]
+
     if not os.path.exists(DATA_FILE):
         default_data = {
             "notes": [
-                "Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling."
+                "*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*"
             ],
-            "house": [],
+            "house": default_house,
             "reports": []
         }
         with open(DATA_FILE, "w") as f:
-            json.dump(default_data, f)
+            json.dump(default_data, f, indent=2)
         return default_data
+
     with open(DATA_FILE, "r") as f:
-        return json.load(f)
+        loaded = json.load(f)
+        # Ensure initial seed data exists if house is empty
+        if not loaded.get("house"):
+            loaded["house"] = default_house
+            save_data(loaded)
+        return loaded
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
@@ -326,7 +370,6 @@ if "current_encouragement" not in st.session_state:
 
 # --- DYNAMIC RANDOMIZER ENGINE ---
 def pick_random_prompt():
-    # Force fresh seed on every draw execution
     random.seed(time.time_ns())
     
     available_choices = ["question", "finish"]
@@ -368,7 +411,7 @@ def pick_random_prompt():
 st.markdown('<div class="main-title">TRUTH CIRCLE</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Come as you are. Say what you mean. You can always pass.</div>', unsafe_allow_html=True)
 
-# --- DE-EMPHASIZED TOP NAVIGATION ---
+# --- TOP NAVIGATION ---
 st.markdown('<div class="subtle-nav">', unsafe_allow_html=True)
 nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
 
@@ -393,12 +436,18 @@ with nav_col3:
         st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- SCREEN 1: HOME SCREEN ---
+# --- SCREEN 1: REDESIGNED CLEAN HOME SCREEN ---
 if st.session_state.view == "home":
-    st.markdown('<div class="tagline">A question. A thought. A little honesty.<br>You never know what you\'ll draw.</div>', unsafe_allow_html=True)
+    st.markdown('''
+        <div class="home-hero-card">
+            <div class="home-hero-icon">✨</div>
+            <div class="home-hero-title">Ready to jump in?</div>
+            <div class="home-hero-text">Draw a question, a thought starter, or an anonymous note from someone else in the circle.</div>
+        </div>
+    ''', unsafe_allow_html=True)
     
-    # Primary Hero Action
-    if st.button("🎲 PICK SOMETHING", use_container_width=True, type="primary"):
+    # Primary Call to Action
+    if st.button("🎲 DRAW A CARD", use_container_width=True, type="primary"):
         st.session_state.current_prompt = pick_random_prompt()
         st.session_state.view = "prompt"
         st.rerun()
@@ -406,11 +455,11 @@ if st.session_state.view == "home":
     st.write("")
     
     # Secondary Actions
-    if st.button("📝 Leave a note", use_container_width=True):
+    if st.button("📝 Leave an anonymous note", use_container_width=True):
         st.session_state.view = "leave_note"
         st.rerun()
 
-    if st.button("🏠 The House", use_container_width=True):
+    if st.button("🏠 Explore The House", use_container_width=True):
         st.session_state.view = "house"
         st.rerun()
 
@@ -422,7 +471,6 @@ elif st.session_state.view == "prompt":
     tag_class = f"tag-{p_type}"
     card_class = f"card-{p_type}"
 
-    # Visual Physical Conversation Card
     st.markdown(f'''
         <div class="prompt-card {card_class}">
             <span class="category-pill {tag_class}">{prompt["category"]}</span>
@@ -440,7 +488,6 @@ elif st.session_state.view == "prompt":
 
     st.markdown('<div class="share-notice">🌐 Your response will be posted anonymously to The House.</div>', unsafe_allow_html=True)
 
-    # Primary Action (Answer/Give 2 cents/Finish & Share)
     if st.button(prompt["btn_label"], use_container_width=True, type="primary"):
         if user_input.strip():
             post_content = f"**{prompt['category']}**\n\"{prompt['text']}\"\n\n**Response:** {user_input}"
@@ -451,7 +498,6 @@ elif st.session_state.view == "prompt":
         else:
             st.warning("Write a quick thought before sharing!")
 
-    # Secondary Action (Throw to House without response)
     st.markdown('<div class="secondary-btn">', unsafe_allow_html=True)
     if st.button("🏠 Throw to House", use_container_width=True):
         post_content = f"**{prompt['category']}**\n\"{prompt['text']}\""
@@ -463,7 +509,6 @@ elif st.session_state.view == "prompt":
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Neutral Pass Action
     if st.button("→ Pass", use_container_width=True):
         random.seed(time.time_ns())
         st.session_state.current_encouragement = random.choice(ENCOURAGEMENT_MESSAGES)
@@ -523,7 +568,9 @@ elif st.session_state.view == "leave_note":
     
     if st.button("DROP IT INTO THE CIRCLE ✨", type="primary", use_container_width=True):
         if note_input.strip():
-            data["notes"].append(note_input)
+            # Format note with asterisks when added
+            formatted_note = f"*{note_input.strip()}*"
+            data["notes"].append(formatted_note)
             save_data(data)
             st.success("Note dropped into the circle.")
             st.session_state.view = "home"
