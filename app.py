@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import json
 import os
+import time
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -308,14 +309,26 @@ FINISH_PROMPTS = [
     "Right now, I really need..."
 ]
 
+ENCOURAGEMENT_MESSAGES = [
+    "No pressure. There's always another card.",
+    "Passing is 100% fine. Speak up when you feel like it.",
+    "No worries at all. Take a breath or peek at what others shared in the House first.",
+    "Your voice matters here whenever you feel ready. Take your time!"
+]
+
 # --- SESSION STATE INITIALIZATION ---
 if "view" not in st.session_state:
     st.session_state.view = "home"
 if "current_prompt" not in st.session_state:
     st.session_state.current_prompt = None
+if "current_encouragement" not in st.session_state:
+    st.session_state.current_encouragement = "No pressure. There's always another card."
 
-# --- RANDOMIZER ENGINE ---
+# --- DYNAMIC RANDOMIZER ENGINE ---
 def pick_random_prompt():
+    # Force fresh seed on every draw execution
+    random.seed(time.time_ns())
+    
     available_choices = ["question", "finish"]
     if data.get("notes") and len(data["notes"]) > 0:
         available_choices.append("note")
@@ -452,15 +465,17 @@ elif st.session_state.view == "prompt":
 
     # Neutral Pass Action
     if st.button("→ Pass", use_container_width=True):
+        random.seed(time.time_ns())
+        st.session_state.current_encouragement = random.choice(ENCOURAGEMENT_MESSAGES)
         st.session_state.view = "pass_encouragement"
         st.rerun()
 
-# --- SCREEN 3: CLEAN PASS SCREEN ---
+# --- SCREEN 3: DYNAMIC PASS SCREEN ---
 elif st.session_state.view == "pass_encouragement":
-    st.markdown('''
+    st.markdown(f'''
         <div class="feedback-card">
             <div class="feedback-title">🌿 No pressure.</div>
-            <div class="feedback-sub">No pressure. There's always another card.</div>
+            <div class="feedback-sub">{st.session_state.current_encouragement}</div>
         </div>
     ''', unsafe_allow_html=True)
     
@@ -493,7 +508,7 @@ elif st.session_state.view == "thrown_confirm":
 
 # --- SCREEN 5: LEAVE ANONYMOUS NOTE ---
 elif st.session_state.view == "leave_note":
-    st.markdown("### Leave a note")
+    st.markdown("### 📝 Leave a note")
     st.markdown("*Something you've been thinking about? Drop it here. No name needed.*")
     
     note_input = st.text_area(
