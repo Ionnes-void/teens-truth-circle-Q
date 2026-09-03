@@ -553,7 +553,7 @@ elif st.session_state.view == "thrown_confirm":
 
 # --- SCREEN 5: LEAVE ANONYMOUS NOTE ---
 elif st.session_state.view == "leave_note":
-    st.markdown("### 📝 Leave a note")
+    st.markdown("### Leave a note")
     st.markdown("*Something you've been thinking about? Drop it here. No name needed.*")
     
     note_input = st.text_area(
