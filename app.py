@@ -294,7 +294,7 @@ def load_data():
     default_house = [
         {
             "id": 0,
-            "content": "**ANONYMOUS NOTE 📝**\n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
+            "content": "**ANONYMOUS NOTE \n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
             "likes": 0,
             "comments": []
         }
@@ -455,7 +455,7 @@ if st.session_state.view == "home":
     st.write("")
     
     # Secondary Actions
-    if st.button("📝 Leave an anonymous note", use_container_width=True):
+    if st.button("Leave an anonymous note", use_container_width=True):
         st.session_state.view = "leave_note"
         st.rerun()
 
