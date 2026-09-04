@@ -19,14 +19,15 @@ st.set_page_config(
 # ==========================================
 @st.cache_resource
 def init_supabase() -> Client:
-    url = st.secrets["supabase"]["SUPABASE_URL"]
-    key = st.secrets["supabase"]["SUPABASE_KEY"]
+    # Ensure secrets exist and URL is cleanly formatted without trailing slashes
+    url = st.secrets["supabase"]["SUPABASE_URL"].strip().rstrip("/")
+    key = st.secrets["supabase"]["SUPABASE_KEY"].strip()
     return create_client(url, key)
 
 try:
     supabase = init_supabase()
 except Exception as e:
-    st.error("⚠️ Connection error. Check your Streamlit Secrets configuration.")
+    st.error("⚠️ Connection error. Please check your Streamlit secrets configuration.")
     st.stop()
 
 # ==========================================
@@ -77,7 +78,7 @@ ENCOURAGEMENT_MESSAGES = [
 # ==========================================
 
 def insert_private_note(content: str):
-    """Inserts a community note into the private draw pool (NOT house_posts)."""
+    """Inserts a community note into the private draw pool (draw_notes) ONLY."""
     try:
         data = {
             "content": content.strip(),
@@ -93,11 +94,11 @@ def insert_private_note(content: str):
 def draw_anonymous_note():
     """Fetches an available community note from Supabase OR falls back to a featured note."""
     try:
-        # 1. Attempt to fetch available community notes
+        # Fetch available community notes
         res = supabase.table("draw_notes").select("*").eq("status", "available").execute()
         available_community_notes = res.data or []
 
-        # 2. Build combined pool (Featured + Available Community)
+        # Combine featured curated notes with available community notes
         pool = []
         for note_text in FEATURED_NOTES:
             pool.append({"type": "featured", "content": note_text})
@@ -105,10 +106,9 @@ def draw_anonymous_note():
         for db_note in available_community_notes:
             pool.append({"type": "community", "raw": db_note, "content": db_note["content"]})
 
-        # 3. Randomly select one note from pool
         selected = random.choice(pool)
 
-        # 4. Mark community note as 'drawn' in Supabase
+        # Mark community note as drawn so it isn't repeatedly reselected
         if selected["type"] == "community":
             db_id = selected["raw"]["id"]
             now_str = datetime.now(timezone.utc).isoformat()
@@ -120,11 +120,10 @@ def draw_anonymous_note():
         return selected["content"]
 
     except Exception as e:
-        # Reliable fallback if network fails
         return random.choice(FEATURED_NOTES)
 
 def create_house_post(post_text: str):
-    """Inserts a public post into house_posts."""
+    """Inserts a post into house_posts once drawn and explicitly shared."""
     try:
         data = {"content": post_text, "likes": 0, "comments": []}
         supabase.table("house_posts").insert(data).execute()
@@ -134,7 +133,7 @@ def create_house_post(post_text: str):
         return False
 
 def fetch_house_posts():
-    """Fetches public posts from house_posts."""
+    """Fetches public feed items from house_posts."""
     try:
         res = supabase.table("house_posts").select("*").order("created_at", desc=True).execute()
         return res.data or []
@@ -201,206 +200,195 @@ def pick_random_card():
         }
 
 # ==========================================
-# 6. REFINED DESIGN SYSTEM & RESPONSIVE CSS
+# 6. GLOBAL SCALABLE DESIGN SYSTEM & LIGHT CSS
 # ==========================================
 st.markdown("""
     <style>
-    /* Reset & Typography */
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
+    /* Light, Modern Global Background */
     .stApp {
-        background: #111015;
-        color: #ECEAF0;
+        background-color: #F8FAFC;
+        color: #0F172A;
     }
 
-    /* Hide Streamlit Chrome */
+    /* Hide Default Chrome */
     #MainMenu, footer, header, .stDeployButton, div[data-testid="stToolbar"] {
         visibility: hidden;
         display: none !important;
     }
 
-    /* Container Constrain & Fluid Spacing */
+    /* Standard Responsive Mobile-First Centered Container */
     .block-container {
-        max-width: 520px !important;
+        max-width: 480px !important;
         padding-top: 1.5rem !important;
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
 
-    /* Brand Header */
+    /* Header Styling */
     .brand-header {
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
     .brand-title {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
         font-weight: 800;
-        letter-spacing: -0.5px;
-        background: linear-gradient(135deg, #FFF 0%, #A5A1B8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 4px;
+        letter-spacing: -0.02em;
+        color: #0F172A;
+        margin-bottom: 2px;
     }
     .brand-sub {
-        font-size: 0.88rem;
-        color: #8E8A9F;
-        font-weight: 400;
+        font-size: 0.85rem;
+        color: #64748B;
+        font-weight: 500;
     }
 
-    /* Minimal Floating Navigation */
+    /* Subtle Navigation Bar */
     .subtle-nav {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 24px;
-        background: rgba(255, 255, 255, 0.03);
+        background: #FFFFFF;
         padding: 4px;
-        border-radius: 100px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
     }
-    
-    /* Dynamic Draw Card Object */
+
+    /* Modern Card Base System */
+    .app-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 20px;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+        margin-bottom: 16px;
+    }
+
+    /* Draw Card Components */
     .draw-card {
-        background: #18161E;
+        background: #FFFFFF;
         border-radius: 24px;
         padding: 32px 24px;
         text-align: center;
-        position: relative;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        margin-bottom: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
 
-    /* Card Variant Accents */
-    .card-note {
-        border: 1px solid rgba(224, 122, 95, 0.3);
-        background: linear-gradient(180deg, #1E1921 0%, #18161E 100%);
-    }
-    .card-question {
-        border: 1px solid rgba(42, 157, 143, 0.3);
-        background: linear-gradient(180deg, #151D20 0%, #18161E 100%);
-    }
-    .card-finish {
-        border: 1px solid rgba(142, 125, 190, 0.3);
-        background: linear-gradient(180deg, #1C1926 0%, #18161E 100%);
-    }
+    .card-note { border: 1px solid #FED7AA; background: linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 100%); }
+    .card-question { border: 1px solid #99F6E4; background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%); }
+    .card-finish { border: 1px solid #DDD6FE; background: linear-gradient(180deg, #F5F3FF 0%, #FFFFFF 100%); }
 
     .card-tag {
         display: inline-block;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 800;
-        letter-spacing: 1.2px;
+        letter-spacing: 0.08em;
         padding: 4px 12px;
-        border-radius: 100px;
-        margin-bottom: 20px;
+        border-radius: 999px;
+        margin-bottom: 16px;
         text-transform: uppercase;
     }
 
-    .tag-note { background: rgba(224, 122, 95, 0.15); color: #F29E85; border: 1px solid rgba(224, 122, 95, 0.3); }
-    .tag-question { background: rgba(42, 157, 143, 0.15); color: #52D1C2; border: 1px solid rgba(42, 157, 143, 0.3); }
-    .tag-finish { background: rgba(142, 125, 190, 0.15); color: #BDB2FF; border: 1px solid rgba(142, 125, 190, 0.3); }
+    .tag-note { background: #FFEDD5; color: #C2410C; }
+    .tag-question { background: #CCFBF1; color: #0F766E; }
+    .tag-finish { background: #EDE9FE; color: #6D28D9; }
 
     .card-text {
-        font-size: 1.35rem;
+        font-size: 1.25rem;
         font-weight: 700;
         line-height: 1.45;
-        color: #F5F4F8;
-        margin-bottom: 16px;
+        color: #0F172A;
+        margin-bottom: 12px;
     }
 
     .card-instruction {
-        font-size: 0.88rem;
-        color: #9A95AA;
+        font-size: 0.85rem;
+        color: #64748B;
         font-weight: 500;
-    }
-
-    /* Feedback & Generic Cards */
-    .app-card {
-        background: #18161E;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 24px;
-        text-align: center;
-        margin-bottom: 20px;
     }
 
     /* Social Feed Items */
     .feed-card {
-        background: #18161E;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 20px;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
         padding: 20px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
     .feed-body {
-        font-size: 1.02rem;
+        font-size: 0.98rem;
         line-height: 1.5;
-        color: #ECEAF0;
+        color: #1E293B;
         white-space: pre-line;
     }
 
-    /* Form Controls & Inputs */
+    /* Form Controls */
     .stTextArea textarea, .stTextInput input {
-        background: #18161E !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 16px !important;
-        color: #F5F4F8 !important;
-        padding: 14px !important;
-        font-size: 0.98rem !important;
+        background: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 14px !important;
+        color: #0F172A !important;
+        padding: 12px 14px !important;
+        font-size: 0.95rem !important;
     }
     .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: #8E7DBE !important;
-        box-shadow: 0 0 0 1px #8E7DBE !important;
+        border-color: #6366F1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
     }
 
-    /* Buttons System (48px Min Touch Targets) */
+    /* Scalable Button Targets */
     div.stButton > button {
         width: 100% !important;
         min-height: 48px !important;
-        border-radius: 100px !important;
+        border-radius: 999px !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        background: #211E2A !important;
-        color: #ECEAF0 !important;
-        transition: all 0.2s ease !important;
+        font-size: 0.92rem !important;
+        border: 1px solid #E2E8F0 !important;
+        background: #FFFFFF !important;
+        color: #334155 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+        transition: all 0.15s ease !important;
     }
     div.stButton > button:hover {
-        background: #2B2737 !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
+        background: #F1F5F9 !important;
+        border-color: #CBD5E1 !important;
+        color: #0F172A !important;
     }
 
-    /* Primary CTA Override */
+    /* Primary Action Buttons */
     div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #7B61FF 0%, #6342E8 100%) !important;
+        background: #4F46E5 !important;
         color: #FFFFFF !important;
         border: none !important;
-        box-shadow: 0 8px 20px rgba(123, 97, 255, 0.25) !important;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25) !important;
     }
     div.stButton > button[kind="primary"]:hover {
-        opacity: 0.92 !important;
+        background: #4338CA !important;
     }
 
     .subtle-info {
-        font-size: 0.8rem;
-        color: #7D7890;
+        font-size: 0.78rem;
+        color: #64748B;
         text-align: center;
         margin-top: 6px;
         margin-bottom: 12px;
     }
 
-    /* Empty States */
     .empty-state {
         text-align: center;
         padding: 40px 20px;
-        color: #7D7890;
+        color: #64748B;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -422,7 +410,7 @@ if "liked_posts" not in st.session_state:
 # ==========================================
 st.markdown('''
     <div class="brand-header">
-        <div class="brand-title">TRUTH CIRCLE</div>
+        <div class="brand-title">Truth Circle</div>
         <div class="brand-sub">Say what you mean. You can always pass.</div>
     </div>
 ''', unsafe_allow_html=True)
@@ -454,9 +442,9 @@ st.markdown('</div>', unsafe_allow_html=True)
 if st.session_state.view == "home":
     st.markdown('''
         <div class="app-card">
-            <div style="font-size: 2.2rem; margin-bottom: 10px;">✨</div>
-            <div style="font-size: 1.2rem; font-weight: 700; color: #F5F4F8; margin-bottom: 6px;">Ready to draw?</div>
-            <div style="font-size: 0.9rem; color: #8E8A9F;">Draw an anonymous note from someone else, an open question, or a thought starter.</div>
+            <div style="font-size: 2rem; margin-bottom: 8px;">✨</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #0F172A; margin-bottom: 4px;">Ready to draw?</div>
+            <div style="font-size: 0.88rem; color: #64748B;">Draw an anonymous note from someone else, an open question, or a thought starter.</div>
         </div>
     ''', unsafe_allow_html=True)
 
@@ -523,8 +511,8 @@ elif st.session_state.view == "draw_card":
 elif st.session_state.view == "pass_encouragement":
     st.markdown(f'''
         <div class="app-card">
-            <div style="font-size: 1.15rem; font-weight: 700; color: #F5F4F8; margin-bottom: 8px;">🌿 No pressure.</div>
-            <div style="font-size: 0.92rem; color: #8E8A9F; line-height: 1.4;">{st.session_state.current_encouragement}</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px;">🌿 No pressure.</div>
+            <div style="font-size: 0.9rem; color: #64748B; line-height: 1.4;">{st.session_state.current_encouragement}</div>
         </div>
     ''', unsafe_allow_html=True)
 
@@ -541,8 +529,8 @@ elif st.session_state.view == "pass_encouragement":
 elif st.session_state.view == "shared_confirm":
     st.markdown('''
         <div class="app-card">
-            <div style="font-size: 1.15rem; font-weight: 700; color: #F5F4F8; margin-bottom: 8px;">✨ It's in the House.</div>
-            <div style="font-size: 0.92rem; color: #8E8A9F; line-height: 1.4;">Others can now see it and add their 2 cents.</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px;">✨ It's in the House.</div>
+            <div style="font-size: 0.9rem; color: #64748B; line-height: 1.4;">Others can now see it and add their 2 cents.</div>
         </div>
     ''', unsafe_allow_html=True)
 
@@ -582,8 +570,8 @@ elif st.session_state.view == "write_note":
 elif st.session_state.view == "note_submitted_confirm":
     st.markdown('''
         <div class="app-card">
-            <div style="font-size: 1.15rem; font-weight: 700; color: #F5F4F8; margin-bottom: 8px;">✨ Your note is in the Circle.</div>
-            <div style="font-size: 0.92rem; color: #8E8A9F; line-height: 1.4;">Someone may draw it later.</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px;">✨ Your note is in the Circle.</div>
+            <div style="font-size: 0.9rem; color: #64748B; line-height: 1.4;">Someone may draw it later.</div>
         </div>
     ''', unsafe_allow_html=True)
 
@@ -606,9 +594,9 @@ elif st.session_state.view == "house":
     if not posts:
         st.markdown('''
             <div class="empty-state">
-                <div style="font-size: 2rem; margin-bottom: 8px;">🌙</div>
-                <div style="font-size: 1.05rem; font-weight: 600; color: #ECEAF0;">The House is quiet.</div>
-                <div style="font-size: 0.88rem; margin-top: 4px;">Leave something for someone else to find.</div>
+                <div style="font-size: 2rem; margin-bottom: 8px;">🌱</div>
+                <div style="font-size: 1.05rem; font-weight: 600; color: #0F172A;">The House is quiet.</div>
+                <div style="font-size: 0.88rem; margin-top: 4px; color: #64748B;">Leave something for someone else to find.</div>
             </div>
         ''', unsafe_allow_html=True)
     else:
