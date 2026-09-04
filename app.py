@@ -221,15 +221,37 @@ st.markdown("""
         color: #0F172A;
     }
 
-    #MainMenu, footer, header, .stDeployButton, div[data-testid="stToolbar"] {
-        visibility: hidden;
+    /* -------------------------------------------------------------
+       HIDE ALL STREAMLIT FOOTER BADGES, PROFILE AVATARS & TOOLBARS
+       ------------------------------------------------------------- */
+    #MainMenu, 
+    footer, 
+    header, 
+    div[data-testid="stToolbar"], 
+    div[data-testid="stHeader"], 
+    div[data-testid="stDecoration"],
+    div[data-testid="stStatusWidget"],
+    div[data-testid="stViewerBadge"],
+    .stDeployButton,
+    [data-testid="stConnectionStatus"],
+    .viewerBadge_container__1A51w,
+    ._container_gz0b1_1,
+    div[class*="viewerBadge"] {
+        visibility: hidden !important;
         display: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
 
+    /* -------------------------------------------------------------
+       LAYOUT & MOBILE SPACING
+       ------------------------------------------------------------- */
     .block-container {
         max-width: 480px !important;
         padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
+        padding-bottom: 2rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
@@ -314,7 +336,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Modern Feed Card Component Styling */
     .feed-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -366,10 +387,6 @@ st.markdown("""
         padding: 12px 14px !important;
         font-size: 0.95rem !important;
     }
-    .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: #6366F1 !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
-    }
 
     div.stButton > button {
         width: 100% !important;
@@ -381,12 +398,6 @@ st.markdown("""
         background: #FFFFFF !important;
         color: #334155 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
-        transition: all 0.15s ease !important;
-    }
-    div.stButton > button:hover {
-        background: #F1F5F9 !important;
-        border-color: #CBD5E1 !important;
-        color: #0F172A !important;
     }
 
     div.stButton > button[kind="primary"] {
@@ -394,23 +405,6 @@ st.markdown("""
         color: #FFFFFF !important;
         border: none !important;
         box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25) !important;
-    }
-    div.stButton > button[kind="primary"]:hover {
-        background: #4338CA !important;
-    }
-
-    .subtle-info {
-        font-size: 0.78rem;
-        color: #64748B;
-        text-align: center;
-        margin-top: 6px;
-        margin-bottom: 12px;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 40px 20px;
-        color: #64748B;
     }
     </style>
 """, unsafe_allow_html=True)
