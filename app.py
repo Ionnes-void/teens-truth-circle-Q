@@ -623,18 +623,35 @@ elif st.session_state.view == "house":
             likes = post.get("likes", 0)
             comments = post.get("comments", [])
 
-            # Parse post body cleanly
+            # Clean parsing logic for both legacy markdown and JSON posts
             try:
                 data = json.loads(post["content"])
                 tag = data.get("tag", "NOTE")
                 prompt = data.get("prompt", "")
                 response = data.get("response", "")
             except Exception:
-                tag = "NOTE"
-                prompt = ""
-                response = post["content"]
+                # Fallback cleaning for legacy plain-text posts
+                raw_content = str(post["content"])
+                
+                if "OPEN QUESTION" in raw_content:
+                    tag = "OPEN QUESTION"
+                elif "FINISH THIS" in raw_content:
+                    tag = "FINISH THIS"
+                else:
+                    tag = "ANONYMOUS NOTE"
 
-            # Render HTML Card Component
+                # Strip out markdown headers, bold tags, and prefixes
+                clean_text = raw_content.replace("**ANONYMOUS NOTE**", "")\
+                                       .replace("**OPEN QUESTION**", "")\
+                                       .replace("**FINISH THIS**", "")\
+                                       .replace("**Response:**", "")\
+                                       .replace("Response:", "")\
+                                       .replace("**", "")\
+                                       .strip()
+                prompt = ""
+                response = clean_text
+
+            # Render clean HTML Card Component
             prompt_html = f'<div class="feed-prompt-box">&ldquo;{prompt}&rdquo;</div>' if prompt else ""
             response_html = f'<div class="feed-response-body">{response}</div>' if response else ""
 
