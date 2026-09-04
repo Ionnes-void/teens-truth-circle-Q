@@ -1,8 +1,7 @@
 import streamlit as st
 import random
-import json
-import os
 import time
+from supabase import create_client, Client
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -11,6 +10,65 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# --- SUPABASE DATABASE CONNECTION ---
+@st.cache_resource
+def init_supabase() -> Client:
+    url = st.secrets["supabase"]["SUPABASE_URL"]
+    key = st.secrets["supabase"]["SUPABASE_KEY"]
+    return create_client(url, key)
+
+try:
+    supabase = init_supabase()
+except Exception as e:
+    st.error("⚠️ Could not connect to Supabase. Check your Streamlit Secrets configuration.")
+    st.stop()
+
+# --- DATABASE HELPER FUNCTIONS ---
+def fetch_house_posts():
+    """Fetch posts from Supabase house_posts table ordered by newest first."""
+    try:
+        response = supabase.table("house_posts").select("*").order("created_at", desc=True).execute()
+        return response.data or []
+    except Exception as e:
+        st.error(f"Error loading posts: {e}")
+        return []
+
+def create_house_post(content: str):
+    """Insert a new post into the house_posts table."""
+    try:
+        data = {"content": content, "likes": 0, "comments": []}
+        supabase.table("house_posts").insert(data).execute()
+    except Exception as e:
+        st.error(f"Error publishing post: {e}")
+
+def update_post_likes(post_id: int, new_like_count: int):
+    """Update like count for a specific post."""
+    try:
+        supabase.table("house_posts").update({"likes": new_like_count}).eq("id", post_id).execute()
+    except Exception as e:
+        st.error(f"Error updating likes: {e}")
+
+def add_post_comment(post_id: int, comments_list: list):
+    """Update comments JSONB array for a specific post."""
+    try:
+        supabase.table("house_posts").update({"comments": comments_list}).eq("id", post_id).execute()
+    except Exception as e:
+        st.error(f"Error adding comment: {e}")
+
+def report_house_post(post: dict):
+    """Move post to reported_posts table and delete from house_posts."""
+    try:
+        # Insert into reported_posts table
+        supabase.table("reported_posts").insert({
+            "content": post["content"],
+            "original_post_id": post["id"]
+        }).execute()
+        
+        # Delete from house_posts table
+        supabase.table("house_posts").delete().eq("id", post["id"]).execute()
+    except Exception as e:
+        st.error(f"Error reporting post: {e}")
 
 # --- RESPONSIVE & MODERN CSS DESIGN ---
 st.markdown("""
@@ -279,41 +337,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA STORAGE ENGINE (SHARED COMMUNITY HOUSE) ---
-DATA_FILE = "data.json"
-
-def load_data():
-    default_house = [
-        {
-            "id": 0,
-            "content": "**ANONYMOUS NOTE 📝**\n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
-            "likes": 0,
-            "comments": []
-        }
-    ]
-
-    if not os.path.exists(DATA_FILE):
-        default_data = {
-            "house": default_house,
-            "reports": []
-        }
-        with open(DATA_FILE, "w") as f:
-            json.dump(default_data, f, indent=2)
-        return default_data
-
-    with open(DATA_FILE, "r") as f:
-        loaded = json.load(f)
-        if "house" not in loaded or not loaded["house"]:
-            loaded["house"] = default_house
-            save_data(loaded)
-        return loaded
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-data = load_data()
-
 # --- OPTION B: CURATED BUILT-IN CARD DECK (CLEAN & ISOLATED) ---
 QUESTIONS = [
     "What's something you wish people understood about you?",
@@ -480,9 +503,8 @@ elif st.session_state.view == "prompt":
 
     if st.button(prompt["btn_label"], use_container_width=True, type="primary"):
         if user_input.strip():
-            post_content = f"**{prompt['category']}**\n\"{prompt['text']}\"\n\n**Response:** {user_input}"
-            data["house"].append({"id": len(data["house"]), "content": post_content, "likes": 0, "comments": []})
-            save_data(data)
+            post_content = f"**{prompt['category']}**\n\"{prompt['text']}\"\n\n**Response:** {user_input.strip()}"
+            create_house_post(post_content)
             st.session_state.view = "thrown_confirm"
             st.rerun()
         else:
@@ -492,9 +514,8 @@ elif st.session_state.view == "prompt":
     if st.button("🏠 Throw to House", use_container_width=True):
         post_content = f"**{prompt['category']}**\n\"{prompt['text']}\""
         if user_input.strip():
-            post_content += f"\n\n**Response:** {user_input}"
-        data["house"].append({"id": len(data["house"]), "content": post_content, "likes": 0, "comments": []})
-        save_data(data)
+            post_content += f"\n\n**Response:** {user_input.strip()}"
+        create_house_post(post_content)
         st.session_state.view = "thrown_confirm"
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -559,30 +580,31 @@ elif st.session_state.view == "leave_note":
     if st.button("DROP IT INTO THE CIRCLE ✨", type="primary", use_container_width=True):
         if note_input.strip():
             post_content = f"**ANONYMOUS NOTE 📝**\n\"*{note_input.strip()}*\""
-            data["house"].append({"id": len(data["house"]), "content": post_content, "likes": 0, "comments": []})
-            save_data(data)
+            create_house_post(post_content)
             st.success("Note posted to The House.")
             st.session_state.view = "house"
             st.rerun()
         else:
             st.warning("Type a thought before dropping it in!")
 
-# --- SCREEN 6: THE HOUSE FEED (SHARED GLOBAL FEED) ---
+# --- SCREEN 6: THE HOUSE FEED (SUPABASE LIVE FEED) ---
 elif st.session_state.view == "house":
     st.markdown("### 🏠 THE HOUSE")
     st.caption("See what's been shared. Anything shared here is visible to other people using the app.")
     st.write("")
 
-    # Guard check for liked_posts session state
     if "liked_posts" not in st.session_state:
         st.session_state.liked_posts = set()
 
-    if not data["house"]:
+    posts = fetch_house_posts()
+
+    if not posts:
         st.info("The house is quiet right now. Be the first to throw something in!")
 
-    for idx, post in enumerate(reversed(data["house"])):
-        real_idx = len(data["house"]) - 1 - idx
-        post_id = post.get("id", real_idx)
+    for post in posts:
+        post_id = post["id"]
+        likes = post.get("likes", 0)
+        comments = post.get("comments", [])
         
         st.markdown(f'<div class="house-card">{post["content"]}</div>', unsafe_allow_html=True)
         
@@ -591,45 +613,38 @@ elif st.session_state.view == "house":
             has_liked = post_id in st.session_state.liked_posts
             like_icon = "💖" if has_liked else "❤️"
             
-            if st.button(f"{like_icon} {post.get('likes', 0)}", key=f"like_{real_idx}"):
-                if "liked_posts" not in st.session_state:
-                    st.session_state.liked_posts = set()
-
+            if st.button(f"{like_icon} {likes}", key=f"like_{post_id}"):
                 if has_liked:
                     # Toggle off
-                    data["house"][real_idx]["likes"] = max(0, post.get("likes", 1) - 1)
+                    new_count = max(0, likes - 1)
+                    update_post_likes(post_id, new_count)
                     st.session_state.liked_posts.remove(post_id)
                 else:
                     # Toggle on
-                    data["house"][real_idx]["likes"] = post.get("likes", 0) + 1
+                    new_count = likes + 1
+                    update_post_likes(post_id, new_count)
                     st.session_state.liked_posts.add(post_id)
-                
-                save_data(data)
                 st.rerun()
         
         with c2:
-            if st.button("🚩 Report", key=f"rep_{real_idx}"):
-                reported_item = data["house"].pop(real_idx)
-                data["reports"].append(reported_item)
-                save_data(data)
+            if st.button("🚩 Report", key=f"rep_{post_id}"):
+                report_house_post(post)
                 st.toast("Post reported and hidden.")
                 st.rerun()
                 
         with st.expander("💬 Give your 2 cents / View responses"):
-            for comment in post.get("comments", []):
+            for comment in comments:
                 st.write(f"• {comment}")
             
             new_comment = st.text_input(
                 label="Add response",
-                key=f"comm_in_{real_idx}",
+                key=f"comm_in_{post_id}",
                 placeholder="Give them your 2 cents...",
                 label_visibility="collapsed"
             )
-            if st.button("Post", key=f"comm_btn_{real_idx}"):
+            if st.button("Post", key=f"comm_btn_{post_id}"):
                 if new_comment.strip():
-                    if "comments" not in data["house"][real_idx]:
-                        data["house"][real_idx]["comments"] = []
-                    data["house"][real_idx]["comments"].append(new_comment)
-                    save_data(data)
+                    comments.append(new_comment.strip())
+                    add_post_comment(post_id, comments)
                     st.rerun()
         st.write("---")
