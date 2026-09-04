@@ -1,6 +1,7 @@
 import streamlit as st
 import random
 import time
+import json
 from datetime import datetime, timezone
 from supabase import create_client, Client
 
@@ -19,10 +20,13 @@ st.set_page_config(
 # ==========================================
 @st.cache_resource
 def init_supabase() -> Client:
-    # Ensure secrets exist and URL is cleanly formatted without trailing slashes
-    url = st.secrets["supabase"]["SUPABASE_URL"].strip().rstrip("/")
+    raw_url = st.secrets["supabase"]["SUPABASE_URL"].strip()
+    
+    # Strip any trailing path or /rest/v1 suffixes that trigger PGRST125
+    clean_url = raw_url.split("/rest/v1")[0].rstrip("/")
     key = st.secrets["supabase"]["SUPABASE_KEY"].strip()
-    return create_client(url, key)
+    
+    return create_client(clean_url, key)
 
 try:
     supabase = init_supabase()
@@ -94,11 +98,9 @@ def insert_private_note(content: str):
 def draw_anonymous_note():
     """Fetches an available community note from Supabase OR falls back to a featured note."""
     try:
-        # Fetch available community notes
         res = supabase.table("draw_notes").select("*").eq("status", "available").execute()
         available_community_notes = res.data or []
 
-        # Combine featured curated notes with available community notes
         pool = []
         for note_text in FEATURED_NOTES:
             pool.append({"type": "featured", "content": note_text})
@@ -108,7 +110,6 @@ def draw_anonymous_note():
 
         selected = random.choice(pool)
 
-        # Mark community note as drawn so it isn't repeatedly reselected
         if selected["type"] == "community":
             db_id = selected["raw"]["id"]
             now_str = datetime.now(timezone.utc).isoformat()
@@ -122,10 +123,15 @@ def draw_anonymous_note():
     except Exception as e:
         return random.choice(FEATURED_NOTES)
 
-def create_house_post(post_text: str):
-    """Inserts a post into house_posts once drawn and explicitly shared."""
+def create_house_post(tag: str, prompt_text: str, response_text: str = ""):
+    """Inserts structured content into house_posts as JSON."""
     try:
-        data = {"content": post_text, "likes": 0, "comments": []}
+        payload = json.dumps({
+            "tag": tag,
+            "prompt": prompt_text,
+            "response": response_text
+        })
+        data = {"content": payload, "likes": 0, "comments": []}
         supabase.table("house_posts").insert(data).execute()
         return True
     except Exception as e:
@@ -164,7 +170,7 @@ def report_house_post(post: dict):
         st.error(f"Error reporting post: {e}")
 
 # ==========================================
-# 5. RANDOMIZER LOGIC (3 CONTENT TYPES)
+# 5. RANDOMIZER LOGIC
 # ==========================================
 def pick_random_card():
     random.seed(time.time_ns())
@@ -200,7 +206,7 @@ def pick_random_card():
         }
 
 # ==========================================
-# 6. GLOBAL SCALABLE DESIGN SYSTEM & LIGHT CSS
+# 6. GLOBAL DESIGN SYSTEM & LIGHT CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -210,19 +216,16 @@ st.markdown("""
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* Light, Modern Global Background */
     .stApp {
         background-color: #F8FAFC;
         color: #0F172A;
     }
 
-    /* Hide Default Chrome */
     #MainMenu, footer, header, .stDeployButton, div[data-testid="stToolbar"] {
         visibility: hidden;
         display: none !important;
     }
 
-    /* Standard Responsive Mobile-First Centered Container */
     .block-container {
         max-width: 480px !important;
         padding-top: 1.5rem !important;
@@ -231,7 +234,6 @@ st.markdown("""
         padding-right: 1rem !important;
     }
 
-    /* Header Styling */
     .brand-header {
         text-align: center;
         margin-bottom: 20px;
@@ -249,7 +251,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Subtle Navigation Bar */
     .subtle-nav {
         background: #FFFFFF;
         padding: 4px;
@@ -259,7 +260,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Modern Card Base System */
     .app-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -270,7 +270,6 @@ st.markdown("""
         margin-bottom: 16px;
     }
 
-    /* Draw Card Components */
     .draw-card {
         background: #FFFFFF;
         border-radius: 24px;
@@ -315,25 +314,50 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Social Feed Items */
+    /* Modern Feed Card Component Styling */
     .feed-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 16px;
+        border-radius: 20px;
         padding: 20px;
-        margin-bottom: 12px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        margin-bottom: 16px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
-    .feed-body {
-        font-size: 0.98rem;
+
+    .feed-tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: #F1F5F9;
+        color: #475569;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+    }
+
+    .feed-prompt-box {
+        background: #F8FAFC;
+        border-left: 3px solid #6366F1;
+        padding: 10px 14px;
+        border-radius: 0 10px 10px 0;
+        font-size: 0.88rem;
+        color: #475569;
+        margin-bottom: 14px;
+        font-style: italic;
+    }
+
+    .feed-response-body {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #0F172A;
         line-height: 1.5;
-        color: #1E293B;
         white-space: pre-line;
     }
 
-    /* Form Controls */
     .stTextArea textarea, .stTextInput input {
         background: #FFFFFF !important;
         border: 1px solid #CBD5E1 !important;
@@ -347,7 +371,6 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
     }
 
-    /* Scalable Button Targets */
     div.stButton > button {
         width: 100% !important;
         min-height: 48px !important;
@@ -366,7 +389,6 @@ st.markdown("""
         color: #0F172A !important;
     }
 
-    /* Primary Action Buttons */
     div.stButton > button[kind="primary"] {
         background: #4F46E5 !important;
         color: #FFFFFF !important;
@@ -486,18 +508,14 @@ elif st.session_state.view == "draw_card":
 
     if st.button(card["btn_label"], use_container_width=True, type="primary"):
         if user_input.strip():
-            post_body = f"**{card['tag']}**\n\"{card['text']}\"\n\n**Response: {user_input.strip()}"
-            if create_house_post(post_body):
+            if create_house_post(card["tag"], card["text"], user_input.strip()):
                 st.session_state.view = "shared_confirm"
                 st.rerun()
         else:
             st.warning("Write a quick thought before sharing!")
 
     if st.button("🏠 Throw to House", use_container_width=True):
-        post_body = f"**\n\"{card['text']}\""
-        if user_input.strip():
-            post_body += f"\n\n**Response:** {user_input.strip()}"
-        if create_house_post(post_body):
+        if create_house_post(card["tag"], card["text"], user_input.strip()):
             st.session_state.view = "shared_confirm"
             st.rerun()
 
@@ -543,7 +561,7 @@ elif st.session_state.view == "shared_confirm":
         st.session_state.view = "draw_card"
         st.rerun()
 
-# --- SCREEN 5: WRITE ANONYMOUS NOTE (PRIVATE POOL SUBMISSION) ---
+# --- SCREEN 5: WRITE ANONYMOUS NOTE ---
 elif st.session_state.view == "write_note":
     st.markdown("### 📝 Write an Anonymous Note")
     st.markdown("*Something you've been thinking about?*")
@@ -605,9 +623,26 @@ elif st.session_state.view == "house":
             likes = post.get("likes", 0)
             comments = post.get("comments", [])
 
+            # Parse post body cleanly
+            try:
+                data = json.loads(post["content"])
+                tag = data.get("tag", "NOTE")
+                prompt = data.get("prompt", "")
+                response = data.get("response", "")
+            except Exception:
+                tag = "NOTE"
+                prompt = ""
+                response = post["content"]
+
+            # Render HTML Card Component
+            prompt_html = f'<div class="feed-prompt-box">&ldquo;{prompt}&rdquo;</div>' if prompt else ""
+            response_html = f'<div class="feed-response-body">{response}</div>' if response else ""
+
             st.markdown(f'''
                 <div class="feed-card">
-                    <div class="feed-body">{post["content"]}</div>
+                    <span class="feed-tag">{tag}</span>
+                    {prompt_html}
+                    {response_html}
                 </div>
             ''', unsafe_allow_html=True)
 
