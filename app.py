@@ -589,13 +589,26 @@ elif st.session_state.view == "house":
 
     for idx, post in enumerate(reversed(data["house"])):
         real_idx = len(data["house"]) - 1 - idx
+        post_id = post.get("id", real_idx)
         
         st.markdown(f'<div class="house-card">{post["content"]}</div>', unsafe_allow_html=True)
         
         c1, c2 = st.columns([1, 1])
         with c1:
-            if st.button(f"❤️ {post.get('likes', 0)}", key=f"like_{real_idx}"):
-                data["house"][real_idx]["likes"] = post.get("likes", 0) + 1
+            # Check if current session already liked this post
+            has_liked = post_id in st.session_state.liked_posts
+            like_icon = "💖" if has_liked else "❤️"
+            
+            if st.button(f"{like_icon} {post.get('likes', 0)}", key=f"like_{real_idx}"):
+                if has_liked:
+                    # Toggle off (Unlike)
+                    data["house"][real_idx]["likes"] = max(0, post.get("likes", 1) - 1)
+                    st.session_state.liked_posts.remove(post_id)
+                else:
+                    # Toggle on (Like once)
+                    data["house"][real_idx]["likes"] = post.get("likes", 0) + 1
+                    st.session_state.liked_posts.add(post_id)
+                
                 save_data(data)
                 st.rerun()
         
