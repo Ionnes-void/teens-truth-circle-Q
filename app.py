@@ -696,3 +696,29 @@ elif st.session_state.view == "house":
                         add_post_comment(post_id, comments)
                         st.rerun()
             st.write("---")
+
+import streamlit.components.v1 as components
+
+# Inject JS to target and remove the host badge from the parent document
+components.html("""
+    <script>
+        const removeBadge = () => {
+            const parentDoc = window.parent.document;
+            const selectors = [
+                '[data-testid="stViewerBadge"]',
+                '.viewerBadge_container__1A51w',
+                'div[class*="viewerBadge"]',
+                'a[href*="streamlit.io"]'
+            ];
+            selectors.forEach(selector => {
+                const elements = parentDoc.querySelectorAll(selector);
+                elements.forEach(el => el.remove());
+            });
+        };
+
+        // Run immediately and observe DOM changes
+        removeBadge();
+        const observer = new MutationObserver(removeBadge);
+        observer.observe(window.parent.document.body, { childList: true, subtree: true });
+    </script>
+""", height=0, width=0)
