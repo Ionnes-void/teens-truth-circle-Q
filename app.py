@@ -65,14 +65,6 @@ st.markdown("""
         font-weight: 400;
     }
 
-    .tagline {
-        text-align: center;
-        font-size: 0.95rem;
-        color: #6C6377;
-        margin-bottom: 20px;
-        line-height: 1.5;
-    }
-
     /* Clean Home Screen Hero Card */
     .home-hero-card {
         background-color: #FFFFFF;
@@ -287,14 +279,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA STORAGE ENGINE ---
+# --- DATA STORAGE ENGINE (SHARED COMMUNITY HOUSE) ---
 DATA_FILE = "data.json"
 
 def load_data():
     default_house = [
         {
             "id": 0,
-            "content": "**ANONYMOUS NOTE \n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
+            "content": "**ANONYMOUS NOTE 📝**\n\"*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*\"\n\n**Response:** Among your friends there ought to be one person that you are comfortable speaking to. the next time the ask you how are you, don't say fine speak more to them. People seldom notice these things that should be glaring.... Maybe you are the one holding back and they are waiting for you to talk more rather giving a short response.",
             "likes": 0,
             "comments": []
         }
@@ -302,9 +294,6 @@ def load_data():
 
     if not os.path.exists(DATA_FILE):
         default_data = {
-            "notes": [
-                "*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*"
-            ],
             "house": default_house,
             "reports": []
         }
@@ -314,8 +303,7 @@ def load_data():
 
     with open(DATA_FILE, "r") as f:
         loaded = json.load(f)
-        # Ensure initial seed data exists if house is empty
-        if not loaded.get("house"):
+        if "house" not in loaded or not loaded["house"]:
             loaded["house"] = default_house
             save_data(loaded)
         return loaded
@@ -326,7 +314,7 @@ def save_data(data):
 
 data = load_data()
 
-# --- PROMPT DATASETS ---
+# --- OPTION B: CURATED BUILT-IN CARD DECK (CLEAN & ISOLATED) ---
 QUESTIONS = [
     "What's something you wish people understood about you?",
     "What's something you're proud of that people don't usually notice?",
@@ -353,6 +341,13 @@ FINISH_PROMPTS = [
     "Right now, I really need..."
 ]
 
+FEATURED_NOTES = [
+    "*Sometimes I feel like I'm the friend everyone comes to when they need something, but nobody notices when I'm struggling.*",
+    "*I feel like I'm acting like a different person depending on who I'm with, and I don't know who I actually am.*",
+    "*I'm really worried about the future, but everyone expects me to have it all figured out already.*",
+    "*I find it hard to ask for help when I'm overwhelmed because I don't want to burden anyone.*"
+]
+
 ENCOURAGEMENT_MESSAGES = [
     "No pressure. There's always another card.",
     "Passing is 100% fine. Speak up when you feel like it.",
@@ -367,23 +362,20 @@ if "current_prompt" not in st.session_state:
     st.session_state.current_prompt = None
 if "current_encouragement" not in st.session_state:
     st.session_state.current_encouragement = "No pressure. There's always another card."
+if "liked_posts" not in st.session_state:
+    st.session_state.liked_posts = set()
 
-# --- DYNAMIC RANDOMIZER ENGINE ---
+# --- HYBRID CARD RANDOMIZER ENGINE ---
 def pick_random_prompt():
     random.seed(time.time_ns())
     
-    available_choices = ["question", "finish"]
-    if data.get("notes") and len(data["notes"]) > 0:
-        available_choices.append("note")
-    
-    choice = random.choice(available_choices)
+    choice = random.choice(["question", "finish", "note"])
 
     if choice == "note":
-        prompt_text = random.choice(data["notes"])
         return {
             "type": "note",
             "category": "ANONYMOUS NOTE 📝",
-            "text": prompt_text,
+            "text": random.choice(FEATURED_NOTES),
             "instruction": "What would you tell this person?",
             "placeholder": "Give them your 2 cents...",
             "btn_label": "💬 Give your 2 cents & Share"
@@ -436,7 +428,7 @@ with nav_col3:
         st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- SCREEN 1: REDESIGNED CLEAN HOME SCREEN ---
+# --- SCREEN 1: HOME SCREEN ---
 if st.session_state.view == "home":
     st.markdown('''
         <div class="home-hero-card">
@@ -446,7 +438,6 @@ if st.session_state.view == "home":
         </div>
     ''', unsafe_allow_html=True)
     
-    # Primary Call to Action
     if st.button("🎲 DRAW A CARD", use_container_width=True, type="primary"):
         st.session_state.current_prompt = pick_random_prompt()
         st.session_state.view = "prompt"
@@ -454,8 +445,7 @@ if st.session_state.view == "home":
 
     st.write("")
     
-    # Secondary Actions
-    if st.button("Leave an anonymous note", use_container_width=True):
+    if st.button("📝 Leave an anonymous note", use_container_width=True):
         st.session_state.view = "leave_note"
         st.rerun()
 
@@ -553,7 +543,7 @@ elif st.session_state.view == "thrown_confirm":
 
 # --- SCREEN 5: LEAVE ANONYMOUS NOTE ---
 elif st.session_state.view == "leave_note":
-    st.markdown("### Leave a note")
+    st.markdown("### 📝 Leave a note")
     st.markdown("*Something you've been thinking about? Drop it here. No name needed.*")
     
     note_input = st.text_area(
@@ -563,26 +553,29 @@ elif st.session_state.view == "leave_note":
         label_visibility="collapsed"
     )
     st.caption("🔒 *Please leave out names and identifying details.*")
-    st.caption("🌐 *Anything dropped here may be drawn by other people using the app.*")
+    st.caption("🌐 *Anything dropped here will be visible in The House.*")
     st.write("")
     
     if st.button("DROP IT INTO THE CIRCLE ✨", type="primary", use_container_width=True):
         if note_input.strip():
-            # Format note with asterisks when added
-            formatted_note = f"*{note_input.strip()}*"
-            data["notes"].append(formatted_note)
+            post_content = f"**ANONYMOUS NOTE 📝**\n\"*{note_input.strip()}*\""
+            data["house"].append({"id": len(data["house"]), "content": post_content, "likes": 0, "comments": []})
             save_data(data)
-            st.success("Note dropped into the circle.")
-            st.session_state.view = "home"
+            st.success("Note posted to The House.")
+            st.session_state.view = "house"
             st.rerun()
         else:
             st.warning("Type a thought before dropping it in!")
 
-# --- SCREEN 6: THE HOUSE FEED ---
+# --- SCREEN 6: THE HOUSE FEED (SHARED GLOBAL FEED) ---
 elif st.session_state.view == "house":
     st.markdown("### 🏠 THE HOUSE")
     st.caption("See what's been shared. Anything shared here is visible to other people using the app.")
     st.write("")
+
+    # Guard check for liked_posts session state
+    if "liked_posts" not in st.session_state:
+        st.session_state.liked_posts = set()
 
     if not data["house"]:
         st.info("The house is quiet right now. Be the first to throw something in!")
@@ -595,17 +588,19 @@ elif st.session_state.view == "house":
         
         c1, c2 = st.columns([1, 1])
         with c1:
-            # Check if current session already liked this post
             has_liked = post_id in st.session_state.liked_posts
             like_icon = "💖" if has_liked else "❤️"
             
             if st.button(f"{like_icon} {post.get('likes', 0)}", key=f"like_{real_idx}"):
+                if "liked_posts" not in st.session_state:
+                    st.session_state.liked_posts = set()
+
                 if has_liked:
-                    # Toggle off (Unlike)
+                    # Toggle off
                     data["house"][real_idx]["likes"] = max(0, post.get("likes", 1) - 1)
                     st.session_state.liked_posts.remove(post_id)
                 else:
-                    # Toggle on (Like once)
+                    # Toggle on
                     data["house"][real_idx]["likes"] = post.get("likes", 0) + 1
                     st.session_state.liked_posts.add(post_id)
                 
